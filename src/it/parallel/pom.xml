@@ -70,6 +70,7 @@
                                 <portName>mysql.first</portName>
                                 <portName>mysql.second</portName>
                                 <portName>mysql.third</portName>
+                                <portName>mysql.fourth</portName>
                             </portNames>
                         </configuration>
                     </execution>
@@ -85,6 +86,15 @@
                         </goals>
                         <configuration>
                             <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.github.mike10004</groupId>
+                                    <artifactId>mariadb-dist</artifactId>
+                                    <version>10.0.27</version>
+                                    <classifier>${mysql.classifier}</classifier>
+                                    <type>zip</type>
+                                    <overWrite>false</overWrite>
+                                    <outputDirectory>${project.build.directory}/mariadb-10.0.27</outputDirectory>
+                                </artifactItem>
                                 <artifactItem>
                                     <groupId>com.github.mike10004</groupId>
                                     <artifactId>mysql-dist</artifactId>
@@ -171,9 +181,20 @@
                         </goals>
                         <configuration>
                             <port>${mysql.third}</port>
-                            <initStrategy>use_bin_mysql_install_db</initStrategy>
                             <dist>${project.build.directory}/mysql-5.7.14</dist>
                             <data>${project.build.directory}/mysql-data-third</data>
+                        </configuration>
+                    </execution>
+                    <execution>
+                        <id>start-stop-fourth</id>
+                        <goals>
+                            <goal>start</goal>
+                            <goal>stop</goal>
+                        </goals>
+                        <configuration>
+                            <port>${mysql.fourth}</port>
+                            <dist>${project.build.directory}/mariadb-10.0.27</dist>
+                            <data>${project.build.directory}/mysql-data-fourth</data>
                         </configuration>
                     </execution>
                 </executions>
@@ -200,6 +221,7 @@
                                 <failsafe.mysql.first>${mysql.first}</failsafe.mysql.first>
                                 <failsafe.mysql.second>${mysql.second}</failsafe.mysql.second>
                                 <failsafe.mysql.third>${mysql.third}</failsafe.mysql.third>
+                                <failsafe.mysql.fourth>${mysql.fourth}</failsafe.mysql.fourth>
                             </systemPropertyVariables>
                         </configuration>
                     </execution>
