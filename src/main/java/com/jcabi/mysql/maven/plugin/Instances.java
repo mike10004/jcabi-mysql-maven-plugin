@@ -193,7 +193,7 @@ public final class Instances {
         BOOTSTRAP;
         
         public String add(Collection<String> args) {
-            String arg = null;
+            String arg;
             switch (this) {
                 case INITIALIZE_INSECURE:
                     arg = "--initialize-insecure";
@@ -202,7 +202,8 @@ public final class Instances {
                     arg = "--bootstrap";
                     break;
                 case NOT_PRESENT:
-                    // do nothing
+                    arg = null;
+                    break;
                 default:
                     throw new IllegalStateException("unhandled enum constant: " + this);
             }
