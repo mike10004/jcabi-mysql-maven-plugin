@@ -171,6 +171,33 @@ public final class Instances {
         return !this.clean;
     }
 
+    private static List<String> buildMysqldArgs(@NotNull Config config, 
+            @NotNull File dist, @NotNull File target, @NotNull File socket, 
+            @NotNull File temp, @NotNull File data, boolean initialize) throws IOException {
+        List<String> cmds = new ArrayList<String>();
+        cmds.add(Instances.NO_DEFAULTS);
+        if (initialize) {
+            cmds.add("--initialize-insecure");
+        }
+        cmds.addAll(Arrays.asList(            
+            String.format("--user=%s", System.getProperty("user.name")),
+            "--general_log",
+            "--console",
+            "--innodb_buffer_pool_size=64M",
+            "--innodb_log_file_size=64M",
+            "--log_warnings",
+            "--innodb_use_native_aio=0",
+            String.format("--binlog-ignore-db=%s", config.dbname()),
+            String.format("--basedir=%s", dist),
+            String.format("--lc-messages-dir=%s", new File(dist, "share")),
+            String.format("--datadir=%s", data),
+            String.format("--tmpdir=%s", temp),
+            String.format("--socket=%s", socket),
+            String.format("--pid-file=%s", new File(target, "mysql.pid")),
+            String.format("--port=%d", config.port())));
+        return cmds;        
+    }
+    
     /**
      * Start a new process.
      * @param config Instance configuration
@@ -191,24 +218,9 @@ public final class Instances {
         } else {
             socket = socketfile;
         }
-        List<String> cmds = new ArrayList<String>();
-        cmds.addAll(Arrays.asList(            
-            Instances.NO_DEFAULTS,
-            String.format("--user=%s", System.getProperty("user.name")),
-            "--general_log",
-            "--console",
-            "--innodb_buffer_pool_size=64M",
-            "--innodb_log_file_size=64M",
-            "--log_warnings",
-            "--innodb_use_native_aio=0",
-            String.format("--binlog-ignore-db=%s", config.dbname()),
-            String.format("--basedir=%s", dist),
-            String.format("--lc-messages-dir=%s", new File(dist, "share")),
-            String.format("--datadir=%s", this.data(dist, target)),
-            String.format("--tmpdir=%s", temp),
-            String.format("--socket=%s", socket),
-            String.format("--pid-file=%s", new File(target, "mysql.pid")),
-            String.format("--port=%d", config.port())));
+        final File dataDir = new File(target, Instances.DATA_SUB_DIR);
+        initializeDataDir(config, dist, target, dataDir, socket, temp);
+        List<String> cmds = buildMysqldArgs(config, dist, target, socket, temp, dataDir, false);
         final ProcessBuilder builder = this.builder(
             dist,
             "bin/mysqld",
@@ -272,8 +284,9 @@ public final class Instances {
      * the version of MySQL or MariaDB.
      */
     static enum InitStrategy {
-        USE_BIN,
-        USE_SCRIPTS
+        USE_SCRIPTS_MYSQL_INSTALL_DB,
+        USE_BIN_MYSQL_INSTALL_DB,
+        USE_MYSQLD_INITIALIZE_OPTION
     }
     
     /**
@@ -290,13 +303,13 @@ public final class Instances {
         for (String suffix : suffixes) {
             String filename = "mysql_install_db" + suffix;
             if (new File(scriptsParent, filename).isFile()) {
-                return InitStrategy.USE_SCRIPTS;
+                return InitStrategy.USE_SCRIPTS_MYSQL_INSTALL_DB;
             }
             if (new File(binParent, filename).isFile()) {
-                return InitStrategy.USE_BIN;
+                return InitStrategy.USE_BIN_MYSQL_INSTALL_DB;
             }
         }
-        throw new IllegalStateException("failed to decide on init strategy");
+        return InitStrategy.USE_MYSQLD_INITIALIZE_OPTION;
     }
     
     /**
@@ -306,9 +319,8 @@ public final class Instances {
      * @return Directory created
      * @throws IOException If fails
      */
-    private File data(final File dist, final File target) throws IOException {
-        final File dir = new File(target, Instances.DATA_SUB_DIR);
-        if (!dir.exists()) {
+    private void initializeDataDir(final Config config, final File dist, final File target, final File dataDir, final File socket, final File temp) throws IOException {
+        if (!dataDir.exists()) {
             final File cnf = new File(
                 new File(dist, "share"),
                 "my-default.cnf"
@@ -318,7 +330,8 @@ public final class Instances {
                 "[mysql]\n# no defaults..."
             );
             InitStrategy initStrategy = decideInitStrategy(dist);
-            if (InitStrategy.USE_SCRIPTS == initStrategy) {
+            Logger.debug(this, "using initialization strategy: %s", initStrategy);            
+            if (InitStrategy.USE_SCRIPTS_MYSQL_INSTALL_DB == initStrategy) {
                 new VerboseProcess(
                     this.builder(
                         dist,
@@ -326,27 +339,39 @@ public final class Instances {
                         String.format("--defaults-file=%s", cnf),
                         "--force",
                         "--innodb_use_native_aio=0",
-                        String.format("--datadir=%s", dir),
+                        String.format("--datadir=%s", dataDir),
                         String.format("--basedir=%s", dist)
                     )
                 ).stdout();
-            } else if (InitStrategy.USE_BIN == initStrategy) {
+            } else if (InitStrategy.USE_BIN_MYSQL_INSTALL_DB == initStrategy) {
                 new VerboseProcess(
                     this.builder(
                         dist,
                         "bin/mysql_install_db",
                         String.format("--defaults-file=%s", cnf),
-                        String.format("--datadir=%s", dir),
+                        String.format("--datadir=%s", dataDir),
                         "--insecure",
                         "--verbose",
-                        String.format("--basedir=%s", dist)
+                        String.format("--basedir=%s", dist)                    
+                    )
+                ).stdout();
+            } else if (InitStrategy.USE_MYSQLD_INITIALIZE_OPTION == initStrategy) {
+                dataDir.mkdirs();
+                if (!dataDir.isDirectory()) {
+                    throw new IOException("failed to create directory " + dataDir);
+                }
+                List<String> args = buildMysqldArgs(config, dist, target, socket, temp, dataDir, true);
+                new VerboseProcess(
+                    this.builder(
+                        dist,
+                        "bin/mysqld",
+                        args.toArray(new String[args.size()])
                     )
                 ).stdout();
             } else {
                 throw new IllegalArgumentException("initialization strategy not recognized: " + initStrategy);
             }
         }
-        return dir;
     }
 
     /**
