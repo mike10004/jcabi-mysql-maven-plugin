@@ -61,6 +61,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.nio.charset.Charset;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -345,16 +346,20 @@ public final class Instances {
     static boolean isMariaDB(File dist) {
         final String mariaIndicatingText = "This is a release of MariaDB.";
         String readmeOpeningText = "";
+        InputStream fin = null;
         try {
             final File readmeFile = new File(dist, "README");
-            readmeOpeningText = new ByteSource() {
-                @Override
-                public InputStream openStream() throws IOException {
-                    return ByteStreams.limit(new FileInputStream(readmeFile), mariaIndicatingText.length());
-                }
-            }.asCharSource(Charsets.US_ASCII).read();
+            fin = new FileInputStream(readmeFile);
+            byte[] buffer = new byte[mariaIndicatingText.length()];
+            int numBytesRead = fin.read(buffer);
+            readmeOpeningText = new String(buffer, 0, numBytesRead, Charset.defaultCharset());
         } catch (IOException e) {
             Logger.info(Instances.class, "failed to determine whether distribution was MariaDB because reading README file failed: " + e.toString());
+        } finally {
+            try {
+                if (fin != null) fin.close();
+            } catch (IOException swallow) {
+            }
         }
         return mariaIndicatingText.equals(readmeOpeningText);
     }
