@@ -45,7 +45,7 @@
     <build>
         <plugins>
             <plugin>
-                <groupId>com.jcabi</groupId>
+                <groupId>@project.groupId@</groupId>
                 <artifactId>jcabi-mysql-maven-plugin</artifactId>
                 <version>@project.version@</version>
                 <configuration>
