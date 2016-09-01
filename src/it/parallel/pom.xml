@@ -69,6 +69,7 @@
                             <portNames>
                                 <portName>mysql.first</portName>
                                 <portName>mysql.second</portName>
+                                <portName>mysql.third</portName>
                             </portNames>
                         </configuration>
                     </execution>
@@ -84,6 +85,15 @@
                         </goals>
                         <configuration>
                             <artifactItems>
+                                <artifactItem>
+                                    <groupId>com.github.mike10004</groupId>
+                                    <artifactId>mysql-dist</artifactId>
+                                    <version>5.7.14</version>
+                                    <classifier>${mysql.classifier}</classifier>
+                                    <type>zip</type>
+                                    <overWrite>false</overWrite>
+                                    <outputDirectory>${project.build.directory}/mysql-5.7.14</outputDirectory>
+                                </artifactItem>
                                 <artifactItem>
                                     <groupId>com.jcabi</groupId>
                                     <artifactId>mysql-dist</artifactId>
@@ -108,9 +118,16 @@
                 </executions>
             </plugin>
             <plugin>
-                <groupId>com.jcabi</groupId>
+                <groupId>@project.groupId@</groupId>
                 <artifactId>jcabi-mysql-maven-plugin</artifactId>
                 <version>@project.version@</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>javax.el</groupId>
+                        <artifactId>javax.el-api</artifactId>
+                        <version>2.2.5</version>
+                    </dependency>         
+                </dependencies>                
                 <configuration>
                     <port>${mysql.port}</port>
                     <dist>${project.build.directory}/mysql-dist</dist>
@@ -146,6 +163,19 @@
                             <data>${project.build.directory}/mysql-data-second</data>
                         </configuration>
                     </execution>
+                    <execution>
+                        <id>start-stop-third</id>
+                        <goals>
+                            <goal>start</goal>
+                            <goal>stop</goal>
+                        </goals>
+                        <configuration>
+                            <port>${mysql.third}</port>
+                            <initStrategy>use_bin_mysql_install_db</initStrategy>
+                            <dist>${project.build.directory}/mysql-5.7.14</dist>
+                            <data>${project.build.directory}/mysql-data-third</data>
+                        </configuration>
+                    </execution>
                 </executions>
             </plugin>
                 <plugin>
@@ -169,6 +199,7 @@
                             <systemPropertyVariables>
                                 <failsafe.mysql.first>${mysql.first}</failsafe.mysql.first>
                                 <failsafe.mysql.second>${mysql.second}</failsafe.mysql.second>
+                                <failsafe.mysql.third>${mysql.third}</failsafe.mysql.third>
                             </systemPropertyVariables>
                         </configuration>
                     </execution>
