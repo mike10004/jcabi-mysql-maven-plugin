@@ -29,6 +29,9 @@
  */
 package com.jcabi.mysql.maven.plugin;
 
+import com.google.common.base.Charsets;
+import com.google.common.io.ByteSource;
+import com.google.common.io.ByteStreams;
 import com.jcabi.aspects.Loggable;
 import com.jcabi.aspects.Tv;
 import com.jcabi.log.Logger;
@@ -51,6 +54,7 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -63,6 +67,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
+import org.apache.commons.lang3.SystemUtils;
 
 
 /**
@@ -182,14 +187,38 @@ public final class Instances {
         return !this.clean;
     }
 
+    private static enum MysqldInitializationOption {
+        NOT_PRESENT,
+        INITIALIZE_INSECURE,
+        BOOTSTRAP;
+        
+        public String add(Collection<String> args) {
+            String arg = null;
+            switch (this) {
+                case INITIALIZE_INSECURE:
+                    arg = "--initialize-insecure";
+                    break;
+                case BOOTSTRAP:
+                    arg = "--bootstrap";
+                    break;
+                case NOT_PRESENT:
+                    // do nothing
+                default:
+                    throw new IllegalStateException("unhandled enum constant: " + this);
+            }
+            if (arg != null) {
+                args.add(arg);
+            }
+            return arg;
+        }
+    }
+    
     private static List<String> buildMysqldArgs(@NotNull Config config, 
             @NotNull File dist, @NotNull File target, @NotNull File socket, 
-            @NotNull File temp, @NotNull File data, boolean initialize) throws IOException {
+            @NotNull File temp, @NotNull File data, MysqldInitializationOption initializeOption) throws IOException {
         List<String> cmds = new ArrayList<String>();
         cmds.add(Instances.NO_DEFAULTS);
-        if (initialize) {
-            cmds.add("--initialize-insecure");
-        }
+        initializeOption.add(cmds);
         cmds.addAll(Arrays.asList(            
             String.format("--user=%s", System.getProperty("user.name")),
             "--general_log",
@@ -231,7 +260,7 @@ public final class Instances {
         }
         final File dataDir = new File(target, Instances.DATA_SUB_DIR);
         initializeDataDir(config, dist, target, dataDir, socket, temp);
-        List<String> cmds = buildMysqldArgs(config, dist, target, socket, temp, dataDir, false);
+        List<String> cmds = buildMysqldArgs(config, dist, target, socket, temp, dataDir, MysqldInitializationOption.NOT_PRESENT);
         final ProcessBuilder builder = this.builder(
             dist,
             "bin/mysqld",
@@ -297,7 +326,36 @@ public final class Instances {
     static enum InitStrategy {
         USE_SCRIPTS_MYSQL_INSTALL_DB,
         USE_BIN_MYSQL_INSTALL_DB,
-        USE_MYSQLD_INITIALIZE_OPTION
+        USE_MYSQLD_INITIALIZE_OPTION,
+        USE_MYSQLD_BOOTSTRAP_OPTION;
+        
+        public MysqldInitializationOption getMysqldOption() {
+            switch (this) {
+                case USE_MYSQLD_BOOTSTRAP_OPTION:
+                    return MysqldInitializationOption.BOOTSTRAP;
+                case USE_MYSQLD_INITIALIZE_OPTION:
+                    return MysqldInitializationOption.INITIALIZE_INSECURE;
+                default:
+                    throw new IllegalArgumentException("getMysqldOption() is not applicable to " + this);
+            }
+        }
+    }
+    
+    static boolean isMariaDB(File dist) {
+        final String mariaIndicatingText = "This is a release of MariaDB.";
+        String readmeOpeningText = "";
+        try {
+            final File readmeFile = new File(dist, "README");
+            readmeOpeningText = new ByteSource() {
+                @Override
+                public InputStream openStream() throws IOException {
+                    return ByteStreams.limit(new FileInputStream(readmeFile), mariaIndicatingText.length());
+                }
+            }.asCharSource(Charsets.US_ASCII).read();
+        } catch (IOException e) {
+            Logger.info(Instances.class, "failed to determine whether distribution was MariaDB because reading README file failed: " + e.toString());
+        }
+        return mariaIndicatingText.equals(readmeOpeningText);
     }
     
     /**
@@ -320,7 +378,11 @@ public final class Instances {
                 return InitStrategy.USE_BIN_MYSQL_INSTALL_DB;
             }
         }
-        return InitStrategy.USE_MYSQLD_INITIALIZE_OPTION;
+        if (isMariaDB(dist) && SystemUtils.IS_OS_WINDOWS) {
+            return InitStrategy.USE_MYSQLD_BOOTSTRAP_OPTION;
+        } else {
+            return InitStrategy.USE_MYSQLD_INITIALIZE_OPTION;
+        }
     }
     
     /**
@@ -366,12 +428,13 @@ public final class Instances {
                         String.format("--basedir=%s", dist)                    
                     )
                 ).output();
-            } else if (InitStrategy.USE_MYSQLD_INITIALIZE_OPTION == initStrategy) {
+            } else if (InitStrategy.USE_MYSQLD_BOOTSTRAP_OPTION == initStrategy || InitStrategy.USE_MYSQLD_INITIALIZE_OPTION == initStrategy) {
+                MysqldInitializationOption option = initStrategy.getMysqldOption();
                 dataDir.mkdirs();
                 if (!dataDir.isDirectory()) {
                     throw new IOException("failed to create directory " + dataDir);
                 }
-                List<String> args = buildMysqldArgs(config, dist, target, socket, temp, dataDir, true);
+                List<String> args = buildMysqldArgs(config, dist, target, socket, temp, dataDir, option);
                 new MoreVerboseProcess(
                     this.builder(
                         dist,
