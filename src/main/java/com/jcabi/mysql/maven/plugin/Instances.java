@@ -38,9 +38,11 @@ import java.io.File;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
@@ -189,9 +191,8 @@ public final class Instances {
         } else {
             socket = socketfile;
         }
-        final ProcessBuilder builder = this.builder(
-            dist,
-            "bin/mysqld",
+        List<String> cmds = new ArrayList<String>();
+        cmds.addAll(Arrays.asList(            
             Instances.NO_DEFAULTS,
             String.format("--user=%s", System.getProperty("user.name")),
             "--general_log",
@@ -207,7 +208,11 @@ public final class Instances {
             String.format("--tmpdir=%s", temp),
             String.format("--socket=%s", socket),
             String.format("--pid-file=%s", new File(target, "mysql.pid")),
-            String.format("--port=%d", config.port())
+            String.format("--port=%d", config.port())));
+        final ProcessBuilder builder = this.builder(
+            dist,
+            "bin/mysqld",
+            cmds.toArray(new String[cmds.size()])
         ).redirectErrorStream(true);
         builder.environment().put("MYSQL_HOME", dist.getAbsolutePath());
         for (final String option : config.options()) {
@@ -258,7 +263,42 @@ public final class Instances {
         }
         return temp;
     }
-
+    
+    /**
+     * Enumeration representing strategies for database server instance 
+     * initialization. The {@code mysql_install_db} script/program is 
+     * used for server instance, but exactly where to find that 
+     * script/program and what arguments to use differs depending on
+     * the version of MySQL or MariaDB.
+     */
+    static enum InitStrategy {
+        USE_BIN,
+        USE_SCRIPTS
+    }
+    
+    /**
+     * Decide on the initialization strategy. This method detects whether 
+     * {@code mysql_install_db} is a script in the {@code scripts} 
+     * directory, as it was prior to MySQL 5.7.6, or a binary executable 
+     * in the {@code bin} directory.
+     * @param dist the distribution directory
+     * @return the initialization strategy
+     */
+    static InitStrategy decideInitStrategy(File dist) {
+        String[] suffixes = { "", ".exe", ".pl" };
+        File binParent = new File(dist, "bin"), scriptsParent = new File(dist, "scripts");
+        for (String suffix : suffixes) {
+            String filename = "mysql_install_db" + suffix;
+            if (new File(scriptsParent, filename).isFile()) {
+                return InitStrategy.USE_SCRIPTS;
+            }
+            if (new File(binParent, filename).isFile()) {
+                return InitStrategy.USE_BIN;
+            }
+        }
+        throw new IllegalStateException("failed to decide on init strategy");
+    }
+    
     /**
      * Prepare and return data directory.
      * @param dist Path to MySQL distribution
@@ -277,17 +317,34 @@ public final class Instances {
                 cnf,
                 "[mysql]\n# no defaults..."
             );
-            new VerboseProcess(
-                this.builder(
-                    dist,
-                    "scripts/mysql_install_db",
-                    String.format("--defaults-file=%s", cnf),
-                    "--force",
-                    "--innodb_use_native_aio=0",
-                    String.format("--datadir=%s", dir),
-                    String.format("--basedir=%s", dist)
-                )
-            ).stdout();
+            InitStrategy initStrategy = decideInitStrategy(dist);
+            if (InitStrategy.USE_SCRIPTS == initStrategy) {
+                new VerboseProcess(
+                    this.builder(
+                        dist,
+                        "scripts/mysql_install_db",
+                        String.format("--defaults-file=%s", cnf),
+                        "--force",
+                        "--innodb_use_native_aio=0",
+                        String.format("--datadir=%s", dir),
+                        String.format("--basedir=%s", dist)
+                    )
+                ).stdout();
+            } else if (InitStrategy.USE_BIN == initStrategy) {
+                new VerboseProcess(
+                    this.builder(
+                        dist,
+                        "bin/mysql_install_db",
+                        String.format("--defaults-file=%s", cnf),
+                        String.format("--datadir=%s", dir),
+                        "--insecure",
+                        "--verbose",
+                        String.format("--basedir=%s", dist)
+                    )
+                ).stdout();
+            } else {
+                throw new IllegalArgumentException("initialization strategy not recognized: " + initStrategy);
+            }
         }
         return dir;
     }
