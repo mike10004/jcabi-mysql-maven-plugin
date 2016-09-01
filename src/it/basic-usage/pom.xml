@@ -96,9 +96,9 @@
                         <configuration>
                             <artifactItems>
                                 <artifactItem>
-                                    <groupId>com.jcabi</groupId>
+                                    <groupId>com.github.mike10004</groupId>
                                     <artifactId>mysql-dist</artifactId>
-                                    <version>5.6.14</version>
+                                    <version>5.7.14</version>
                                     <classifier>${mysql.classifier}</classifier>
                                     <type>zip</type>
                                     <overWrite>false</overWrite>
@@ -110,11 +110,12 @@
                 </executions>
             </plugin>
             <plugin>
-                <groupId>com.jcabi</groupId>
+                <groupId>@project.groupId@</groupId>
                 <artifactId>jcabi-mysql-maven-plugin</artifactId>
                 <version>@project.version@</version>
                 <configuration>
                     <port>${mysql.port}</port>
+                    <initStrategy>use_bin_mysql_install_db</initStrategy>
                 </configuration>
                 <executions>
                     <execution>
@@ -125,6 +126,13 @@
                         </goals>
                     </execution>
                 </executions>
+                <dependencies>
+                    <dependency>
+                        <groupId>javax.el</groupId>
+                        <artifactId>javax.el-api</artifactId>
+                        <version>2.2.5</version>
+                    </dependency>         
+                </dependencies>                
             </plugin>
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>

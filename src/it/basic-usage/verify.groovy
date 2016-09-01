@@ -29,6 +29,7 @@
  */
 
 def log = new File(basedir, 'build.log')
-assert log.text.contains('Installing MySQL system tables...')
+// 5.6 and 5.7 print different messages to the log, so we check for either one
+assert log.text.contains('Creating system tables...done') || log.text.contains('Installing MySQL system tables...')
 assert log.text.contains('InnoDB: Completed initialization of buffer pool')
 new File(basedir, 'target').deleteDir()
