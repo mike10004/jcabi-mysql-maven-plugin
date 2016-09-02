@@ -29,9 +29,6 @@
  */
 package com.jcabi.mysql.maven.plugin;
 
-import com.google.common.base.Charsets;
-import com.google.common.io.ByteSource;
-import com.google.common.io.ByteStreams;
 import com.jcabi.aspects.Loggable;
 import com.jcabi.aspects.Tv;
 import com.jcabi.log.Logger;
@@ -68,7 +65,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import lombok.EqualsAndHashCode;
 import lombok.ToString;
-import org.apache.commons.lang3.SystemUtils;
+import org.apache.commons.io.Charsets;
 
 
 /**
@@ -343,25 +340,49 @@ public final class Instances {
         }
     }
     
-    static boolean isMariaDB(File dist) {
+    protected boolean isMariaDB(File dist) {
+        File readmeFile = new File(dist, "README");
         final String mariaIndicatingText = "This is a release of MariaDB.";
-        String readmeOpeningText = "";
+        return doesFileStartWithText(readmeFile, Charsets.US_ASCII, mariaIndicatingText);
+    }
+    
+    protected static class PartialByteArray {
+        
+        public final byte[] bytes;
+        public final int length;
+
+        public PartialByteArray(byte[] bytes, int length) {
+            this.bytes = bytes;
+            this.length = length;
+        }
+        
+    }
+    
+    protected PartialByteArray readFirstBytes(File file, int length) throws IOException {
         InputStream fin = null;
         try {
-            final File readmeFile = new File(dist, "README");
-            fin = new FileInputStream(readmeFile);
-            byte[] buffer = new byte[mariaIndicatingText.length()];
+            fin = new FileInputStream(file);
+            byte[] buffer = new byte[length];
             int numBytesRead = fin.read(buffer);
-            readmeOpeningText = new String(buffer, 0, numBytesRead, Charset.defaultCharset());
-        } catch (IOException e) {
-            Logger.info(Instances.class, "failed to determine whether distribution was MariaDB because reading README file failed: " + e.toString());
+            return new PartialByteArray(buffer, numBytesRead);
         } finally {
             try {
                 if (fin != null) fin.close();
             } catch (IOException swallow) {
             }
         }
-        return mariaIndicatingText.equals(readmeOpeningText);
+    }
+    
+    protected boolean doesFileStartWithText(File file, Charset charset, String referenceText) {
+        PartialByteArray firstBytes;
+        try {
+            firstBytes = readFirstBytes(file, referenceText.length());
+        } catch (IOException e) {
+            Logger.info(Instances.class, "failed to read bytes from file: " + e.toString());
+            return false;
+        }
+        String queryText = new String(firstBytes.bytes, 0, firstBytes.length, charset);
+        return referenceText.equals(queryText);
     }
     
     /**
@@ -372,7 +393,7 @@ public final class Instances {
      * @param dist the distribution directory
      * @return the initialization strategy
      */
-    static InitStrategy decideInitStrategy(File dist) {
+    protected InitStrategy decideInitStrategy(File dist) {
         String[] suffixes = { "", ".exe", ".pl" };
         File binParent = new File(dist, "bin"), scriptsParent = new File(dist, "scripts");
         for (String suffix : suffixes) {
@@ -384,7 +405,17 @@ public final class Instances {
                 return InitStrategy.USE_BIN_MYSQL_INSTALL_DB;
             }
         }
-        if (isMariaDB(dist) && SystemUtils.IS_OS_WINDOWS) {
+        return decideMysqldOption(isMariaDB(dist), isForWindows(dist));
+    }
+
+    protected boolean isForWindows(File distDir) {
+        File binDir = new File(distDir, "bin");
+        File mysqldExe = new File(binDir, "mysqld.exe");
+        return mysqldExe.isFile();
+    }
+    
+    protected InitStrategy decideMysqldOption(boolean mariadb, boolean windows) {
+        if (mariadb && windows) {
             return InitStrategy.USE_MYSQLD_BOOTSTRAP_OPTION;
         } else {
             return InitStrategy.USE_MYSQLD_INITIALIZE_OPTION;

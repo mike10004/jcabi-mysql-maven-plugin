@@ -29,17 +29,23 @@
  */
 package com.jcabi.mysql.maven.plugin;
 
+import com.google.common.base.Charsets;
 import com.google.common.io.Files;
 import com.jcabi.jdbc.JdbcSession;
 import java.io.File;
 import java.net.ServerSocket;
+import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import org.hamcrest.MatcherAssert;
+import org.junit.Assert;
+import static org.junit.Assert.assertEquals;
 import org.junit.Ignore;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.TemporaryFolder;
 
 /**
  * Test case for {@link Instances}.
@@ -88,6 +94,9 @@ public final class InstancesTest {
     private static final String CONNECTION_STRING =
         "jdbc:mysql://localhost:%d/%s?user=%s&password=%s";
 
+    @Rule
+    public TemporaryFolder temporaryFolder = new TemporaryFolder();
+    
     /**
      * Instances can start and stop.
      * @throws Exception If something is wrong
@@ -105,7 +114,7 @@ public final class InstancesTest {
                 Collections.<String>emptyList()
             ),
             new File(InstancesTest.DIST),
-            Files.createTempDir(),
+            temporaryFolder.newFolder(),
             true,
             null
         );
@@ -159,7 +168,7 @@ public final class InstancesTest {
                 Collections.singletonList("sql-mode=ALLOW_INVALID_DATES")
             ),
             new File(InstancesTest.DIST),
-            Files.createTempDir(),
+            temporaryFolder.newFolder(),
             true,
             null
         );
@@ -215,7 +224,7 @@ public final class InstancesTest {
                 Collections.<String>emptyList()
             ),
             new File(InstancesTest.DIST),
-            Files.createTempDir(),
+            temporaryFolder.newFolder(),
             true,
             null
         );
@@ -270,7 +279,7 @@ public final class InstancesTest {
                 Collections.<String>emptyList()
             ),
             new File(InstancesTest.DIST),
-            Files.createTempDir(),
+            temporaryFolder.newFolder(),
             true,
             null
         );
@@ -322,7 +331,7 @@ public final class InstancesTest {
                 Collections.<String>emptyList()
             ),
             new File(InstancesTest.DIST),
-            Files.createTempDir(),
+            temporaryFolder.newFolder(),
             true,
             null
         );
@@ -373,7 +382,7 @@ public final class InstancesTest {
                 Collections.<String>emptyList()
             ),
             new File(InstancesTest.DIST),
-            Files.createTempDir(),
+            temporaryFolder.newFolder(),
             false,
             null
         );
@@ -419,7 +428,7 @@ public final class InstancesTest {
     @Ignore
     public void canReuseExistingDatabse() throws Exception {
         final int port = this.reserve();
-        final File target = Files.createTempDir();
+        final File target = temporaryFolder.newFolder();
         final Instances instances = new Instances();
         instances.start(
             new Config(
@@ -554,4 +563,33 @@ public final class InstancesTest {
         }
         return dist;
     }
+    
+    @Test
+    public void doesFileStartWithText() throws Exception {
+        Charset charset = Charsets.US_ASCII;
+        File file = temporaryFolder.newFile();
+        Files.write("abc\ndef\nghi\n", file, charset);
+        Instances instances = new Instances();
+        boolean actual = instances.doesFileStartWithText(file, charset, "abc");
+        assertEquals(true, actual);
+        actual = instances.doesFileStartWithText(file, charset, "ghi");
+        assertEquals(false, actual);
+    }
+    
+    @Test
+    public void isForWindows() throws Exception {
+        testIsForWindows("mysqld.exe", true);
+        testIsForWindows("mysqld", false);
+    }
+    
+    private void testIsForWindows(String exeName, boolean expected) throws Exception {
+        Instances instances = new Instances();
+        File distDir = temporaryFolder.newFolder();
+        File binDir = new File(distDir, "bin");
+        File exe = new File(binDir, exeName);
+        Files.createParentDirs(exe);
+        Files.touch(exe);
+        assertEquals(expected, instances.isForWindows(distDir));
+    }
+
 }
