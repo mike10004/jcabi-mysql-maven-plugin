@@ -43,19 +43,26 @@ import org.junit.Test;
 public final class ParallelITCase {
 
     /**
-     * First MySQL port.
-     */
-    private static final String FIRST =
-        System.getProperty("failsafe.mysql.first");
-
-    /**
      * MySQL works.
      * @throws Exception If something is wrong
      */
     @Test
     public void basicMySqlManipulations() throws Exception {
-        Class.forName("com.mysql.jdbc.Driver").newInstance();
-        this.process(Integer.parseInt(ParallelITCase.FIRST));
+        Class.forName("com.mysql.jdbc.Driver");
+        String[] portPropertyNames = {
+            "failsafe.mysql.first",
+            "failsafe.mysql.second",
+            "failsafe.mysql.third",
+            "failsafe.mysql.fourth",
+        };
+        for (String portPropertyName : portPropertyNames) {
+            String portStr = System.getProperty(portPropertyName);
+            if (portStr != null) {
+                this.process(Integer.parseInt(portStr));
+            } else {
+                System.err.println("not defined: " + portPropertyName);
+            }
+        }
     }
 
     /**
