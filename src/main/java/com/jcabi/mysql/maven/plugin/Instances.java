@@ -394,6 +394,9 @@ public final class Instances {
      * @return the initialization strategy
      */
     protected InitStrategy decideInitStrategy(File dist) {
+        if (isMariaDB(dist) && isForWindows(dist)) {
+            return InitStrategy.USE_MYSQLD_BOOTSTRAP_OPTION;
+        }
         String[] suffixes = { "", ".exe", ".pl" };
         File binParent = new File(dist, "bin"), scriptsParent = new File(dist, "scripts");
         for (String suffix : suffixes) {
@@ -405,21 +408,13 @@ public final class Instances {
                 return InitStrategy.USE_BIN_MYSQL_INSTALL_DB;
             }
         }
-        return decideMysqldOption(isMariaDB(dist), isForWindows(dist));
+        return InitStrategy.USE_MYSQLD_INITIALIZE_OPTION;
     }
 
     protected boolean isForWindows(File distDir) {
         File binDir = new File(distDir, "bin");
         File mysqldExe = new File(binDir, "mysqld.exe");
         return mysqldExe.isFile();
-    }
-    
-    protected InitStrategy decideMysqldOption(boolean mariadb, boolean windows) {
-        if (mariadb && windows) {
-            return InitStrategy.USE_MYSQLD_BOOTSTRAP_OPTION;
-        } else {
-            return InitStrategy.USE_MYSQLD_INITIALIZE_OPTION;
-        }
     }
     
     /**
