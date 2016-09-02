@@ -30,6 +30,6 @@
 
 def log = new File(basedir, 'build.log')
 // ignoring this assertion because MySQL 5.7 mysqld --initialize[-insecure] doesn't print a message like this
-# assert log.text.contains('Creating system tables...done')
+// assert log.text.contains('Creating system tables...done')
 assert log.text.contains('InnoDB: Completed initialization of buffer pool')
 new File(basedir, 'target').deleteDir()
