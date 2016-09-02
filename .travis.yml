@@ -18,7 +18,7 @@ env:
     - JAVA_OPTS="-XX:MaxPermSize=2g -Xmx4g"
 script:
   - set -e
-  - mvn clean install -Pqulice --quiet
+  - mvn clean install --quiet
   - mvn clean
   - pdd --source=$(pwd) --file=/dev/null
   - est --dir=est --file=/dev/null
