@@ -315,13 +315,13 @@ public final class Instances {
         }
     }
     
-    protected boolean isMariaDB(File dist) {
+    static boolean isMariaDB(File dist) {
         File readmeFile = new File(dist, "README");
         final String mariaIndicatingText = "This is a release of MariaDB.";
         return doesFileStartWithText(readmeFile, Charsets.US_ASCII, mariaIndicatingText);
     }
     
-    protected static class PartialByteArray {
+    static class PartialByteArray {
         
         public final byte[] bytes;
         public final int length;
@@ -333,7 +333,7 @@ public final class Instances {
         
     }
     
-    protected PartialByteArray readFirstBytes(File file, int length) throws IOException {
+    static PartialByteArray readFirstBytes(File file, int length) throws IOException {
         InputStream fin = null;
         try {
             fin = new FileInputStream(file);
@@ -348,7 +348,7 @@ public final class Instances {
         }
     }
     
-    protected boolean doesFileStartWithText(File file, Charset charset, String referenceText) {
+    static boolean doesFileStartWithText(File file, Charset charset, String referenceText) {
         PartialByteArray firstBytes;
         try {
             firstBytes = readFirstBytes(file, referenceText.length());
@@ -368,7 +368,7 @@ public final class Instances {
      * @param dist the distribution directory
      * @return the initialization strategy
      */
-    protected InitStrategy decideInitStrategy(File dist) {
+    static InitStrategy decideInitStrategy(File dist) {
         String[] suffixes = { "", ".exe", ".pl" };
         File binParent = new File(dist, "bin"), scriptsParent = new File(dist, "scripts");
         boolean windows = isForWindows(dist);
@@ -389,7 +389,7 @@ public final class Instances {
         return InitStrategy.USE_MYSQLD_INITIALIZE_OPTION;
     }
 
-    protected boolean isForWindows(File distDir) {
+    static boolean isForWindows(File distDir) {
         File binDir = new File(distDir, "bin");
         File mysqldExe = new File(binDir, "mysqld.exe");
         return mysqldExe.isFile();
