@@ -149,6 +149,7 @@
                             <port>${mysql.second}</port>
                             <dist>${project.build.directory}/mysql-5.6.14</dist>
                             <data>${project.build.directory}/mysql-data-second</data>
+                            <socket>${java.io.tmpdir}/mysql-${mysql.second}.sock</socket>
                         </configuration>
                     </execution>
                     <execution>
@@ -161,6 +162,7 @@
                             <port>${mysql.third}</port>
                             <dist>${project.build.directory}/mysql-5.7.14</dist>
                             <data>${project.build.directory}/mysql-data-third</data>
+                            <socket>${java.io.tmpdir}/mysql-${mysql.third}.sock</socket>
                         </configuration>
                     </execution>
                     <execution>
@@ -173,6 +175,7 @@
                             <port>${mysql.fourth}</port>
                             <dist>${project.build.directory}/mariadb-10.0.27</dist>
                             <data>${project.build.directory}/mysql-data-fourth</data>
+                            <socket>${java.io.tmpdir}/mysql-${mysql.fourth}.sock</socket>
                         </configuration>
                     </execution>
                 </executions>
