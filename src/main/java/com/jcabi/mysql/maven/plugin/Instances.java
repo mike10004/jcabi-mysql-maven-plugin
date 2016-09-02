@@ -59,6 +59,7 @@ import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
 import java.nio.charset.Charset;
+import java.util.Collections;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
@@ -187,10 +188,12 @@ public final class Instances {
     
     private static List<String> buildMysqldArgs(@NotNull Config config, 
             @NotNull File dist, @NotNull File target, @NotNull File socket, 
-            @NotNull File temp, @NotNull File data, InitStrategy initStrategy) throws IOException {
+            @NotNull File temp, @NotNull File data, Iterable<String> otherFlags) throws IOException {
         List<String> cmds = new ArrayList<String>();
         cmds.add(Instances.NO_DEFAULTS);
-        initStrategy.addMysqldArgument(cmds);
+        for (String option : otherFlags) {
+            cmds.add(option);        
+        }
         cmds.addAll(Arrays.asList(            
             String.format("--user=%s", System.getProperty("user.name")),
             "--general_log",
@@ -231,8 +234,8 @@ public final class Instances {
             socket = socketfile;
         }
         final File dataDir = new File(target, Instances.DATA_SUB_DIR);
-        InitStrategy initStrategy = initializeDataDir(config, dist, target, dataDir, socket, temp);
-        List<String> cmds = buildMysqldArgs(config, dist, target, socket, temp, dataDir, initStrategy);
+        initializeDataDir(config, dist, target, dataDir, socket, temp);
+        List<String> cmds = buildMysqldArgs(config, dist, target, socket, temp, dataDir, Collections.<String>emptyList());
         final ProcessBuilder builder = this.builder(
             dist,
             "bin/mysqld",
@@ -296,25 +299,19 @@ public final class Instances {
      * the version of MySQL or MariaDB.
      */
     static enum InitStrategy {
-        USE_SCRIPTS_MYSQL_INSTALL_DB,
-        USE_MARIADB_WINDOWS_BIN_MYSQL_INSTALL_DB,
-        USE_STANDARD_BIN_MYSQL_INSTALL_DB,
-        USE_MYSQLD_INITIALIZE_OPTION;
+        USE_SCRIPTS_MYSQL_INSTALL_DB(Collections.<String>emptyList()),
+        USE_MARIADB_WINDOWS_BIN_MYSQL_INSTALL_DB(Collections.<String>emptyList()),
+        USE_STANDARD_BIN_MYSQL_INSTALL_DB(Collections.<String>emptyList()),
+        USE_MYSQLD_INITIALIZE_OPTION(Collections.unmodifiableList(Arrays.asList("--initialize-insecure")));
         
-        public String addMysqldArgument(Collection<String> args) {
-            String arg;
-            switch (this) {
-                case USE_MYSQLD_INITIALIZE_OPTION:
-                    arg = "--initialize-insecure";
-                    break;
-                default:
-                    arg = null;
-                    break;
-            }
-            if (arg != null) {
-                args.add(arg);
-            }
-            return arg;
+        private final Collection<String> mysqldInitOptions;
+        
+        InitStrategy(Collection<String> mysqldInitOptions) {
+            this.mysqldInitOptions = mysqldInitOptions;
+        }
+        
+        public Iterable<String> getMysqldInitOptions() {
+            return mysqldInitOptions;
         }
     }
     
@@ -456,7 +453,7 @@ public final class Instances {
                 if (!dataDir.isDirectory()) {
                     throw new IOException("failed to create directory " + dataDir);
                 }
-                List<String> args = buildMysqldArgs(config, dist, target, socket, temp, dataDir, initStrategy);
+                List<String> args = buildMysqldArgs(config, dist, target, socket, temp, dataDir, initStrategy.getMysqldInitOptions());
                 new MoreVerboseProcess(
                     this.builder(
                         dist,
