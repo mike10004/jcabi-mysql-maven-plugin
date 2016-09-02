@@ -451,6 +451,19 @@ public final class Instances {
                         String.format("--port=%s", config.port())
                     )
                 ).output();
+            } else if (InitStrategy.USE_MYSQLD_INITIALIZE_OPTION == initStrategy) {
+                dataDir.mkdirs();
+                if (!dataDir.isDirectory()) {
+                    throw new IOException("failed to create directory " + dataDir);
+                }
+                List<String> args = buildMysqldArgs(config, dist, target, socket, temp, dataDir, initStrategy);
+                new MoreVerboseProcess(
+                    this.builder(
+                        dist,
+                        "bin/mysqld",
+                        args.toArray(new String[args.size()])
+                    )
+                ).output();                
             } else {
                 throw new IllegalArgumentException("initialization strategy not recognized: " + initStrategy);
             }
