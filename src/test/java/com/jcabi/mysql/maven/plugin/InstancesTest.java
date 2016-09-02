@@ -33,12 +33,14 @@ import com.google.common.base.Charsets;
 import com.google.common.io.Files;
 import com.jcabi.jdbc.JdbcSession;
 import java.io.File;
+import java.io.IOException;
 import java.net.ServerSocket;
 import java.nio.charset.Charset;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.util.Collections;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.hamcrest.MatcherAssert;
 import org.junit.Assert;
 import static org.junit.Assert.assertEquals;
@@ -94,8 +96,24 @@ public final class InstancesTest {
     private static final String CONNECTION_STRING =
         "jdbc:mysql://localhost:%d/%s?user=%s&password=%s";
 
+    private static final AtomicInteger newFolderCount = new AtomicInteger(0);
+    
     @Rule
-    public TemporaryFolder temporaryFolder = new TemporaryFolder();
+    public TemporaryFolder temporaryFolder = new TemporaryFolder() {
+        // use shorter names for new subfolders because otherwise socket path is too long on OS X
+        @Override
+        public File newFolder() throws IOException {
+            File folder = new File(getRoot(), String.valueOf(newFolderCount.incrementAndGet()));
+            if (folder.isDirectory()) {
+                throw new IOException("already exists: " + folder);
+            }
+            folder.mkdirs();
+            if (!folder.isDirectory()) {
+                throw new IOException("failed to create folder at " + folder);
+            }
+            return folder;
+        }
+    };
     
     /**
      * Instances can start and stop.
@@ -569,10 +587,9 @@ public final class InstancesTest {
         Charset charset = Charsets.US_ASCII;
         File file = temporaryFolder.newFile();
         Files.write("abc\ndef\nghi\n", file, charset);
-        Instances instances = new Instances();
-        boolean actual = instances.doesFileStartWithText(file, charset, "abc");
+        boolean actual = Instances.doesFileStartWithText(file, charset, "abc");
         assertEquals(true, actual);
-        actual = instances.doesFileStartWithText(file, charset, "ghi");
+        actual = Instances.doesFileStartWithText(file, charset, "ghi");
         assertEquals(false, actual);
     }
     
@@ -583,13 +600,12 @@ public final class InstancesTest {
     }
     
     private void testIsForWindows(String exeName, boolean expected) throws Exception {
-        Instances instances = new Instances();
         File distDir = temporaryFolder.newFolder();
         File binDir = new File(distDir, "bin");
         File exe = new File(binDir, exeName);
         Files.createParentDirs(exe);
         Files.touch(exe);
-        assertEquals(expected, instances.isForWindows(distDir));
+        assertEquals(expected, Instances.isForWindows(distDir));
     }
 
 }
