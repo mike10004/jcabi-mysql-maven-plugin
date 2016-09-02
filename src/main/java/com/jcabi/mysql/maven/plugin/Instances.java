@@ -184,40 +184,13 @@ public final class Instances {
     public boolean reusedExistingDatabase() {
         return !this.clean;
     }
-
-    private static enum MysqldInitializationOption {
-        NOT_PRESENT,
-        INITIALIZE_INSECURE,
-        BOOTSTRAP;
-        
-        public String add(Collection<String> args) {
-            String arg;
-            switch (this) {
-                case INITIALIZE_INSECURE:
-                    arg = "--initialize-insecure";
-                    break;
-                case BOOTSTRAP:
-                    arg = "--bootstrap";
-                    break;
-                case NOT_PRESENT:
-                    arg = null;
-                    break;
-                default:
-                    throw new IllegalStateException("unhandled enum constant: " + this);
-            }
-            if (arg != null) {
-                args.add(arg);
-            }
-            return arg;
-        }
-    }
     
     private static List<String> buildMysqldArgs(@NotNull Config config, 
             @NotNull File dist, @NotNull File target, @NotNull File socket, 
-            @NotNull File temp, @NotNull File data, MysqldInitializationOption initializeOption) throws IOException {
+            @NotNull File temp, @NotNull File data, InitStrategy initStrategy) throws IOException {
         List<String> cmds = new ArrayList<String>();
         cmds.add(Instances.NO_DEFAULTS);
-        initializeOption.add(cmds);
+        initStrategy.addMysqldArgument(cmds);
         cmds.addAll(Arrays.asList(            
             String.format("--user=%s", System.getProperty("user.name")),
             "--general_log",
@@ -258,8 +231,8 @@ public final class Instances {
             socket = socketfile;
         }
         final File dataDir = new File(target, Instances.DATA_SUB_DIR);
-        initializeDataDir(config, dist, target, dataDir, socket, temp);
-        List<String> cmds = buildMysqldArgs(config, dist, target, socket, temp, dataDir, MysqldInitializationOption.NOT_PRESENT);
+        InitStrategy initStrategy = initializeDataDir(config, dist, target, dataDir, socket, temp);
+        List<String> cmds = buildMysqldArgs(config, dist, target, socket, temp, dataDir, initStrategy);
         final ProcessBuilder builder = this.builder(
             dist,
             "bin/mysqld",
@@ -324,19 +297,24 @@ public final class Instances {
      */
     static enum InitStrategy {
         USE_SCRIPTS_MYSQL_INSTALL_DB,
-        USE_BIN_MYSQL_INSTALL_DB,
-        USE_MYSQLD_INITIALIZE_OPTION,
-        USE_MYSQLD_BOOTSTRAP_OPTION;
+        USE_MARIADB_WINDOWS_BIN_MYSQL_INSTALL_DB,
+        USE_STANDARD_BIN_MYSQL_INSTALL_DB,
+        USE_MYSQLD_INITIALIZE_OPTION;
         
-        public MysqldInitializationOption getMysqldOption() {
+        public String addMysqldArgument(Collection<String> args) {
+            String arg;
             switch (this) {
-                case USE_MYSQLD_BOOTSTRAP_OPTION:
-                    return MysqldInitializationOption.BOOTSTRAP;
                 case USE_MYSQLD_INITIALIZE_OPTION:
-                    return MysqldInitializationOption.INITIALIZE_INSECURE;
+                    arg = "--initialize-insecure";
+                    break;
                 default:
-                    throw new IllegalArgumentException("getMysqldOption() is not applicable to " + this);
+                    arg = null;
+                    break;
             }
+            if (arg != null) {
+                args.add(arg);
+            }
+            return arg;
         }
     }
     
@@ -394,18 +372,21 @@ public final class Instances {
      * @return the initialization strategy
      */
     protected InitStrategy decideInitStrategy(File dist) {
-        if (isMariaDB(dist) && isForWindows(dist)) {
-            return InitStrategy.USE_MYSQLD_BOOTSTRAP_OPTION;
-        }
         String[] suffixes = { "", ".exe", ".pl" };
         File binParent = new File(dist, "bin"), scriptsParent = new File(dist, "scripts");
+        boolean windows = isForWindows(dist);
+        boolean mariadb = isMariaDB(dist);
         for (String suffix : suffixes) {
             String filename = "mysql_install_db" + suffix;
             if (new File(scriptsParent, filename).isFile()) {
                 return InitStrategy.USE_SCRIPTS_MYSQL_INSTALL_DB;
             }
             if (new File(binParent, filename).isFile()) {
-                return InitStrategy.USE_BIN_MYSQL_INSTALL_DB;
+                if (mariadb && windows) {
+                    return InitStrategy.USE_MARIADB_WINDOWS_BIN_MYSQL_INSTALL_DB;
+                } else {
+                    return InitStrategy.USE_STANDARD_BIN_MYSQL_INSTALL_DB;
+                }
             }
         }
         return InitStrategy.USE_MYSQLD_INITIALIZE_OPTION;
@@ -424,7 +405,8 @@ public final class Instances {
      * @return Directory created
      * @throws IOException If fails
      */
-    private void initializeDataDir(final Config config, final File dist, final File target, final File dataDir, final File socket, final File temp) throws IOException {
+    private InitStrategy initializeDataDir(final Config config, final File dist, final File target, final File dataDir, final File socket, final File temp) throws IOException {
+        InitStrategy initStrategy = decideInitStrategy(dist);
         if (!dataDir.exists()) {
             final File cnf = new File(
                 new File(dist, "share"),
@@ -434,7 +416,6 @@ public final class Instances {
                 cnf,
                 "[mysql]\n# no defaults..."
             );
-            InitStrategy initStrategy = decideInitStrategy(dist);
             Logger.debug(this, "using initialization strategy: %s", initStrategy);            
             if (InitStrategy.USE_SCRIPTS_MYSQL_INSTALL_DB == initStrategy) {
                 new MoreVerboseProcess(
@@ -448,7 +429,7 @@ public final class Instances {
                         String.format("--basedir=%s", dist)
                     )
                 ).output();
-            } else if (InitStrategy.USE_BIN_MYSQL_INSTALL_DB == initStrategy) {
+            } else if (InitStrategy.USE_STANDARD_BIN_MYSQL_INSTALL_DB == initStrategy) {
                 new MoreVerboseProcess(
                     this.builder(
                         dist,
@@ -460,24 +441,21 @@ public final class Instances {
                         String.format("--basedir=%s", dist)                    
                     )
                 ).output();
-            } else if (InitStrategy.USE_MYSQLD_BOOTSTRAP_OPTION == initStrategy || InitStrategy.USE_MYSQLD_INITIALIZE_OPTION == initStrategy) {
-                MysqldInitializationOption option = initStrategy.getMysqldOption();
-                dataDir.mkdirs();
-                if (!dataDir.isDirectory()) {
-                    throw new IOException("failed to create directory " + dataDir);
-                }
-                List<String> args = buildMysqldArgs(config, dist, target, socket, temp, dataDir, option);
+            } else if (InitStrategy.USE_MARIADB_WINDOWS_BIN_MYSQL_INSTALL_DB == initStrategy) {
                 new MoreVerboseProcess(
                     this.builder(
                         dist,
-                        "bin/mysqld",
-                        args.toArray(new String[args.size()])
+                        "bin/mysql_install_db.exe",
+                        String.format("--datadir=%s", dataDir),
+                        String.format("--socket=%s", socket),
+                        String.format("--port=%s", config.port())
                     )
                 ).output();
             } else {
                 throw new IllegalArgumentException("initialization strategy not recognized: " + initStrategy);
             }
         }
+        return initStrategy;
     }
 
     /**
