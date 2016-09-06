@@ -39,7 +39,7 @@
     </parent>
     <groupId>com.github.mike10004</groupId>
     <artifactId>jcabi-mysql-maven-plugin</artifactId>
-    <version>1.0r1</version>
+    <version>1.0r2-SNAPSHOT</version>
     <packaging>maven-plugin</packaging>
     <name>jcabi-mysql-maven-plugin</name>
     <description>MySQL plugin for integration testing</description>
@@ -194,6 +194,17 @@
                             <surefire.dist>${project.build.directory}/mysql-dist</surefire.dist>
                         </systemPropertyVariables>
                     </configuration>
+                </plugin>
+                <plugin>
+                    <groupId>com.jcabi</groupId>
+                    <artifactId>jcabi-maven-plugin</artifactId>
+                    <dependencies>
+                        <dependency>
+                            <groupId>javax.el</groupId>
+                            <artifactId>javax.el-api</artifactId>
+                            <version>2.2.5</version>
+                        </dependency>         
+                    </dependencies>
                 </plugin>
             </plugins>
         </pluginManagement>
