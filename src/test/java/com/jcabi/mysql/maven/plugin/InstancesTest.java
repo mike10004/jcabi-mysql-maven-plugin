@@ -136,7 +136,7 @@ public final class InstancesTest {
             true,
             null
         );
-        Class.forName(InstancesTest.DRIVER).newInstance();
+        Class.forName(InstancesTest.DRIVER).getDeclaredConstructor().newInstance();
         try {
             final Connection conn = DriverManager.getConnection(
                 String.format(
@@ -190,7 +190,7 @@ public final class InstancesTest {
             true,
             null
         );
-        Class.forName(InstancesTest.DRIVER).newInstance();
+        Class.forName(InstancesTest.DRIVER).getDeclaredConstructor().newInstance();
         try {
             final Connection conn = DriverManager.getConnection(
                 String.format(
@@ -246,7 +246,7 @@ public final class InstancesTest {
             true,
             null
         );
-        Class.forName(InstancesTest.DRIVER).newInstance();
+        Class.forName(InstancesTest.DRIVER).getDeclaredConstructor().newInstance();
         try {
             final Connection conn = DriverManager.getConnection(
                 String.format(
@@ -301,7 +301,7 @@ public final class InstancesTest {
             true,
             null
         );
-        Class.forName(InstancesTest.DRIVER).newInstance();
+        Class.forName(InstancesTest.DRIVER).getDeclaredConstructor().newInstance();
         try {
             final Connection conn = DriverManager.getConnection(
                 String.format(
@@ -353,7 +353,7 @@ public final class InstancesTest {
             true,
             null
         );
-        Class.forName(InstancesTest.DRIVER).newInstance();
+        Class.forName(InstancesTest.DRIVER).getDeclaredConstructor().newInstance();
         try {
             final Connection conn = DriverManager.getConnection(
                 String.format(
@@ -408,7 +408,7 @@ public final class InstancesTest {
             "Instance reusedExistingDatabase should be false.",
             !instances.reusedExistingDatabase()
         );
-        Class.forName(InstancesTest.DRIVER).newInstance();
+        Class.forName(InstancesTest.DRIVER).getDeclaredConstructor().newInstance();
         try {
             final Connection conn = DriverManager.getConnection(
                 String.format(
@@ -465,7 +465,7 @@ public final class InstancesTest {
             "Instance reusedExistingDatabase should be false.",
             !instances.reusedExistingDatabase()
         );
-        Class.forName(InstancesTest.DRIVER).newInstance();
+        Class.forName(InstancesTest.DRIVER).getDeclaredConstructor().newInstance();
         try {
             final Connection conn = DriverManager.getConnection(
                 String.format(
