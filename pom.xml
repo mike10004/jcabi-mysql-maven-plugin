@@ -39,7 +39,7 @@
     </parent>
     <groupId>com.github.mike10004</groupId>
     <artifactId>jcabi-mysql-maven-plugin</artifactId>
-    <version>1.0r3-SNAPSHOT</version>
+    <version>1.0r3</version>
     <packaging>maven-plugin</packaging>
     <name>jcabi-mysql-maven-plugin</name>
     <description>MySQL plugin for integration testing</description>
