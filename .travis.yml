@@ -1,3 +1,4 @@
+if: branch !~ ^appveyor-
 language: java
 jdk: openjdk11
 sudo: false
