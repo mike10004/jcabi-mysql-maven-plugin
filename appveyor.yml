@@ -9,8 +9,8 @@ branches:
   except:
     - gh-pages
 install:
-  - cmd: SET MAVEN_OPTS=-XX:MaxPermSize=2g -Xmx4g
-  - cmd: SET JAVA_OPTS=-XX:MaxPermSize=2g -Xmx4g
+  - cmd: SET MAVEN_OPTS=-Xmx4g
+  - cmd: SET JAVA_OPTS=-Xmx4g
   - cmd: mvn --version
   - cmd: java -version
 build_script:
